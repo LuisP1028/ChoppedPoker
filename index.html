@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Logic Engine // GTO Tools</title>
+    
+    <!-- FONTS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #050505;
+            --text-color: #ffffff;
+            --glass-surface: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-highlight: rgba(255, 255, 255, 0.08);
+            --accent-color: #ff3b00; /* Brutalist Orange */
+            --card-radius: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* --- BACKGROUND NOISE & CANVAS --- */
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.07'/%3E%3C/svg%3E");
+            pointer-events: none; z-index: 0;
+        }
+
+        #particle-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1; opacity: 0.4; pointer-events: none;
+        }
+
+        /* --- LAYOUT --- */
+        .main-container {
+            position: relative;
+            z-index: 10;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* --- HEADER & MARQUEE --- */
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-size: 4rem;
+            line-height: 0.9;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -2px;
+            margin-bottom: 20px;
+            background: linear-gradient(180deg, #fff, #888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .marquee-container {
+            width: 100%;
+            overflow: hidden;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding: 10px 0;
+            margin-bottom: 40px;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(5px);
+        }
+
+        .marquee-content {
+            display: inline-block;
+            white-space: nowrap;
+            animation: scroll 20s linear infinite;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--accent-color);
+        }
+
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* --- GRID --- */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            width: 100%;
+        }
+
+        /* --- GLASS CARDS --- */
+        .glass-card {
+            position: relative;
+            text-decoration: none;
+            color: white;
+            background: var(--glass-surface);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--card-radius);
+            padding: 40px;
+            height: 320px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            transform-style: preserve-3d;
+        }
+
+        /* Card Hover Effects */
+        .glass-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            border-color: rgba(255, 255, 255, 0.4);
+            background: var(--glass-highlight);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 20px rgba(255, 59, 0, 0.1);
+        }
+
+        .glass-card::before {
+            /* Glare Effect */
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 50%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            transform: skewX(-25deg);
+            transition: 0.5s;
+            pointer-events: none;
+        }
+
+        .glass-card:hover::before {
+            left: 150%;
+            transition: 0.7s;
+        }
+
+        /* Card Content */
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            color: #666;
+        }
+        
+        .suit-icon {
+            font-size: 2rem;
+            line-height: 1;
+            opacity: 0.5;
+            transition: 0.3s;
+        }
+        
+        .glass-card:hover .suit-icon {
+            opacity: 1;
+            color: var(--accent-color);
+            text-shadow: 0 0 10px var(--accent-color);
+        }
+
+        .card-body h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            line-height: 1.1;
+            text-transform: uppercase;
+        }
+
+        .card-body p {
+            font-size: 0.95rem;
+            color: #aaa;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .launch-btn {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--accent-color);
+            opacity: 0.8;
+            transition: 0.3s;
+        }
+
+        .glass-card:hover .launch-btn {
+            opacity: 1;
+            gap: 15px; /* Arrow slide animation */
+        }
+
+        /* --- FOOTER --- */
+        footer {
+            text-align: center;
+            padding: 40px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: #555;
+            z-index: 10;
+        }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 900px) {
+            h1 { font-size: 2.5rem; }
+            .cards-grid { grid-template-columns: 1fr; }
+            .glass-card { height: auto; min-height: 250px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="noise-overlay"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <div class="main-container">
+        
+        <header>
+            <h1>Poker Logic<br>Engine</h1>
+        </header>
+
+        <div class="marquee-container">
+            <div class="marquee-content">
+                GTO STRATEGY &nbsp;///&nbsp; NASH EQUILIBRIUM &nbsp;///&nbsp; EV CALCULATIONS &nbsp;///&nbsp; RANGE CONSTRUCTION &nbsp;///&nbsp; INDIFFERENCE PRINCIPLE &nbsp;///&nbsp; MINIMUM DEFENSE FREQUENCY &nbsp;///&nbsp; GEOMETRIC SIZING &nbsp;///&nbsp; BLUFF EFFICIENCY &nbsp;///&nbsp; 
+                GTO STRATEGY &nbsp;///&nbsp; NASH EQUILIBRIUM &nbsp;///&nbsp; EV CALCULATIONS &nbsp;///&nbsp; RANGE CONSTRUCTION &nbsp;///&nbsp; INDIFFERENCE PRINCIPLE &nbsp;///&nbsp; MINIMUM DEFENSE FREQUENCY &nbsp;///&nbsp; GEOMETRIC SIZING &nbsp;///&nbsp; BLUFF EFFICIENCY &nbsp;///&nbsp; 
+            </div>
+        </div>
+
+        <div class="cards-grid">
+
+            <!-- CARD 1: EV CALCULATOR -->
+            <a href="CHECK_BET_EVs.html" class="glass-card" data-tilt>
+                <div class="card-top">
+                    <span>A</span>
+                    <span class="suit-icon">♠</span>
+                </div>
+                <div class="card-body">
+                    <h2>Check vs Bet EV Calculator</h2>
+                    <p>Real-time value-bet vs check decision tool with indifference/MDF calculations and brutalist UI.</p>
+                    <span class="launch-btn">Open Tool <span>→</span></span>
+                </div>
+            </a>
+
+            <!-- CARD 2: TURN RANGE VISUALIZER -->
+            <a href="TURNRANGECOMPOSITION.html" class="glass-card" data-tilt>
+                <div class="card-top">
+                    <span>K</span>
+                    <span class="suit-icon">♥</span>
+                </div>
+                <div class="card-body">
+                    <h2>Turn Range Composition</h2>
+                    <p>Visualizer showing how flop betting frequencies filter the range arriving to the turn (air-to-value ratio).</p>
+                    <span class="launch-btn">Open Tool <span>→</span></span>
+                </div>
+            </a>
+
+            <!-- CARD 3: STRATEGY MAP -->
+            <a href="betMap.html" class="glass-card" data-tilt>
+                <div class="card-top">
+                    <span>Q</span>
+                    <span class="suit-icon">♦</span>
+                </div>
+                <div class="card-body">
+                    <h2>PvBC Strategy Map</h2>
+                    <p>Interactive 2D strategy heatmap for optimal big-blind defense against any turn/river c-bet frequencies.</p>
+                    <span class="launch-btn">Open Tool <span>→</span></span>
+                </div>
+            </a>
+
+            <!-- CARD 4: EQUILIBRIUM CONSTRUCTOR -->
+            <a href="math.html" class="glass-card" data-tilt>
+                <div class="card-top">
+                    <span>J</span>
+                    <span class="suit-icon">♣</span>
+                </div>
+                <div class="card-body">
+                    <h2>Equilibrium Constructor</h2>
+                    <p>Geometric bet sizing, alpha ratios, and recursive bluff calculations with anchored card-popover explanations.</p>
+                    <span class="launch-btn">Open Tool <span>→</span></span>
+                </div>
+            </a>
+
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2025 • OPEN SOURCE • GITHUB PAGES</p>
+    </footer>
+
+    <script>
+        // --- 1. PARTICLE SYSTEM (Floating Suits) ---
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        const particles = [];
+        const suits = ['♠', '♥', '♦', '♣'];
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        class Particle {
+            constructor() {
+                this.reset();
+                // Randomize initial y to fill screen immediately
+                this.y = Math.random() * height;
+            }
+
+            reset() {
+                this.x = Math.random() * width;
+                this.y = height + 50;
+                this.speed = 0.2 + Math.random() * 0.5;
+                this.size = 10 + Math.random() * 20;
+                this.suit = suits[Math.floor(Math.random() * suits.length)];
+                this.opacity = 0.1 + Math.random() * 0.3;
+                this.drift = (Math.random() - 0.5) * 0.5;
+            }
+
+            update() {
+                this.y -= this.speed;
+                this.x += this.drift;
+                
+                if (this.y < -50) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `${this.size}px Arial`;
+                ctx.fillText(this.suit, this.x, this.y);
+            }
+        }
+
+        function initParticles() {
+            resize();
+            for(let i = 0; i < 30; i++) {
+                particles.push(new Particle());
+            }
+            animate();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', resize);
+        initParticles();
+
+
+        // --- 2. TILT EFFECT (Vanilla JS) ---
+        const cards = document.querySelectorAll('.glass-card');
+
+        cards.forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Calculate percentage from center
+                const xPct = (x / rect.width - 0.5) * 2; // -1 to 1
+                const yPct = (y / rect.height - 0.5) * 2; // -1 to 1
+
+                // Max rotation degrees
+                const rotation = 5; 
+                
+                card.style.transform = `
+                    perspective(1000px) 
+                    rotateY(${xPct * rotation}deg) 
+                    rotateX(${yPct * -rotation}deg) 
+                    translateY(-5px) 
+                    scale(1.02)
+                `;
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(1000px) rotateY(0) rotateX(0) translateY(0) scale(1)';
+            });
+        });
+
+    </script>
+
+</body>
+</html>

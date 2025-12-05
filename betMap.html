@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Strategy Map: Bluff-Catching BB</title>
+    <style>
+        /* SWISS STYLE / INTERNATIONAL TYPOGRAPHIC STYLE SETUP */
+        :root {
+            --color-bg: #ffffff;
+            --color-text: #000000;
+            --color-call-call: #0047BB; /* Cobalt Blue */
+            --color-call-fold: #FF3030; /* Swiss Red */
+            --color-fold: #333333;      /* Dark Grey */
+            --color-impossible: #ffffff;
+            --border-width: 2px;
+            --font-main: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-main);
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* LAYOUT GRID */
+        header {
+            padding: 20px 40px;
+            border-bottom: var(--border-width) solid var(--color-text);
+        }
+
+        h1 {
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        h2 {
+            font-size: 14px;
+            text-transform: uppercase;
+            margin: 0 0 10px 0;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            height: calc(100vh - 70px); /* Adjust based on header height */
+            overflow: hidden;
+        }
+
+        /* SIDEBAR / CONTROLS */
+        .sidebar {
+            padding: 30px;
+            border-right: var(--border-width) solid var(--color-text);
+            background: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            overflow-y: auto;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* FLAT INPUT STYLING */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            background: var(--color-text);
+            border: none;
+            border-radius: 0;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: #ccc;
+            border: none;
+        }
+
+        input[type="number"] {
+            font-family: var(--font-main);
+            border: 1px solid var(--color-text);
+            padding: 5px;
+            font-size: 14px;
+            width: 70px;
+            border-radius: 0;
+            -moz-appearance: textfield;
+        }
+        
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* LEGEND */
+        .legend {
+            margin-top: auto;
+            border-top: var(--border-width) solid var(--color-text);
+            padding-top: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .swatch {
+            width: 16px;
+            height: 16px;
+            border: 1px solid var(--color-text);
+        }
+
+        /* VISUALIZATION AREA */
+        .viz-area {
+            position: relative;
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 800px; /* Maximize reasonable size */
+            max-height: 800px;
+            border: var(--border-width) solid var(--color-text);
+            margin: 0 auto;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* AXIS LABELS */
+        .axis-label {
+            position: absolute;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .y-axis {
+            top: 50%;
+            left: -35px;
+            transform: rotate(-90deg) translateX(50%);
+            transform-origin: center left;
+        }
+
+        .x-axis {
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* READOUT OVERLAY */
+        .readout {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            background: white;
+            border: 1px solid black;
+            padding: 10px 15px;
+            font-size: 14px;
+            font-weight: 700;
+            z-index: 10;
+        }
+
+        #strategy-name {
+            color: var(--color-text);
+        }
+
+        @media (max-width: 800px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+                height: auto;
+            }
+            .sidebar {
+                border-right: none;
+                border-bottom: var(--border-width) solid var(--color-text);
+            }
+            .canvas-wrapper {
+                height: 400px; 
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>PvBC Strategy Map</h1>
+</header>
+
+<div class="container">
+    <aside class="sidebar">
+        <h2>Game Parameters</h2>
+        
+        <div class="control-group">
+            <label>Effective Stack (S)</label>
+            <div class="input-row">
+                <input type="range" id="inputS" min="1" max="100" step="1" value="21">
+                <input type="number" id="numS" value="21">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Pot Size (P)</label>
+            <div class="input-row">
+                <input type="range" id="inputP" min="1" max="50" step="1" value="8">
+                <input type="number" id="numP" value="8">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Turn Bet (B)</label>
+            <div class="input-row">
+                <input type="range" id="inputB" min="1" max="50" step="1" value="6">
+                <input type="number" id="numB" value="6">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Prop. Nuts (N) <span id="valN">0.25</span></label>
+            <div class="input-row">
+                <input type="range" id="inputN" min="0" max="1" step="0.01" value="0.25">
+            </div>
+        </div>
+
+        <hr style="width:100%; border:0; border-top:1px solid #ccc; margin: 10px 0;">
+
+        <h2>Villain Stats</h2>
+
+        <div class="control-group">
+            <label>Turn C-Bet % (cT) <span id="valCT">0.50</span></label>
+            <div class="input-row">
+                <input type="range" id="inputCT" min="0.01" max="1" step="0.01" value="0.50">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>River C-Bet % (cR) <span id="valCR">0.50</span></label>
+            <div class="input-row">
+                <input type="range" id="inputCR" min="0" max="1" step="0.01" value="0.50">
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="swatch" style="background: var(--color-fold);"></div>
+                <span>Fold</span>
+            </div>
+            <div class="legend-item">
+                <div class="swatch" style="background: var(--color-call-fold);"></div>
+                <span>Call - Fold</span>
+            </div>
+            <div class="legend-item">
+                <div class="swatch" style="background: var(--color-call-call);"></div>
+                <span>Call - Call</span>
+            </div>
+            <div class="legend-item">
+                <div class="swatch" style="background: var(--color-impossible);"></div>
+                <span>Impossible</span>
+            </div>
+        </div>
+    </aside>
+
+    <main class="viz-area">
+        <div class="readout">
+            Strategy: <span id="strategy-name">CALCULATING...</span><br>
+            EV: <span id="strategy-ev">0</span>
+        </div>
+        <div class="canvas-wrapper">
+            <div class="axis-label y-axis">River C-Bet Freq (cR)</div>
+            <div class="axis-label x-axis">Turn C-Bet Freq (cT)</div>
+            <canvas id="strategyMap" width="600" height="600"></canvas>
+        </div>
+    </main>
+</div>
+
+<script>
+    // Configuration and State
+    const state = {
+        S: 21,
+        P: 8,
+        B: 6,
+        N: 0.25,
+        cT: 0.50,
+        cR: 0.50
+    };
+
+    // DOM Elements
+    const canvas = document.getElementById('strategyMap');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const strategyNameEl = document.getElementById('strategy-name');
+    const strategyEvEl = document.getElementById('strategy-ev');
+
+    // Colors (R, G, B)
+    const COL_FOLD = [51, 51, 51];       // #333
+    const COL_CF = [255, 48, 48];        // #FF3030
+    const COL_CC = [0, 71, 187];         // #0047BB
+    const COL_IMP = [255, 255, 255];     // #FFF
+
+    // --- LOGIC ---
+
+    function calculateEVs(S, P, B, N, cT, cR) {
+        // Condition 1: Impossible
+        if (cT < N) {
+            return { type: 'IMPOSSIBLE', maxEV: 0 };
+        }
+
+        // EV(Fold)
+        const evFold = S;
+
+        // EV(Call-Fold)
+        // Logic: Call Turn (B). If Checks (1-cR), Win S+P+B. If Bets (cR), Fold (S-B).
+        const evCF = ((1 - cR) * (S + P + B)) + (cR * (S - B));
+
+        // EV(Call-Call)
+        // Formula from text:
+        // TermA = ((cT - cR*cT) / cT) * (S + P + B)
+        // TermB = ((cR*cT - N) / cT) * (2*S + P)
+        // Note: Prevent divide by zero if cT is 0 (though covered by cT < N check)
+        const termA = ((cT - (cR * cT)) / cT) * (S + P + B);
+        const termB = (((cR * cT) - N) / cT) * ((2 * S) + P);
+        const evCC = termA + termB;
+
+        // Determine Optimal
+        let maxEV = evFold;
+        let strategy = 'FOLD';
+
+        if (evCF > maxEV) {
+            maxEV = evCF;
+            strategy = 'CALL - FOLD';
+        }
+        if (evCC > maxEV) {
+            maxEV = evCC;
+            strategy = 'CALL - CALL';
+        }
+
+        return { type: strategy, maxEV: maxEV, fold: evFold, cf: evCF, cc: evCC };
+    }
+
+    // --- RENDERING ---
+
+    function drawMap() {
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // Create pixel buffer
+        const imageData = ctx.createImageData(width, height);
+        const data = imageData.data;
+
+        // Loop through every pixel
+        for (let y = 0; y < height; y++) {
+            // Map y to cR (0 at bottom, 1 at top)
+            // cR = 1.0 - (y / height)
+            const pixelCR = 1.0 - (y / height);
+
+            for (let x = 0; x < width; x++) {
+                // Map x to cT (0 at left, 1 at right)
+                const pixelCT = x / width;
+
+                // Calculate Strategy for this coordinate
+                // Use state S, P, B, N, but pixel CT/CR
+                // IMPOSSIBLE CHECK:
+                if (pixelCT < state.N) {
+                    const index = (y * width + x) * 4;
+                    data[index] = COL_IMP[0];
+                    data[index+1] = COL_IMP[1];
+                    data[index+2] = COL_IMP[2];
+                    data[index+3] = 255;
+                    continue;
+                }
+
+                const res = calculateEVs(state.S, state.P, state.B, state.N, pixelCT, pixelCR);
+
+                let col = COL_FOLD;
+                if (res.type === 'CALL - FOLD') col = COL_CF;
+                if (res.type === 'CALL - CALL') col = COL_CC;
+
+                const index = (y * width + x) * 4;
+                data[index] = col[0];
+                data[index+1] = col[1];
+                data[index+2] = col[2];
+                data[index+3] = 255;
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        drawCrosshair();
+        updateReadout();
+    }
+
+    function drawCrosshair() {
+        const x = state.cT * canvas.width;
+        const y = (1 - state.cR) * canvas.height;
+
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 10);
+        ctx.lineTo(x, y + 10);
+        ctx.moveTo(x - 10, y);
+        ctx.lineTo(x + 10, y);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 10);
+        ctx.lineTo(x, y + 10);
+        ctx.moveTo(x - 10, y);
+        ctx.lineTo(x + 10, y);
+        ctx.stroke();
+        
+        // Dot
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    function updateReadout() {
+        const res = calculateEVs(state.S, state.P, state.B, state.N, state.cT, state.cR);
+        strategyNameEl.textContent = res.type;
+        strategyNameEl.style.color = getStrategyColor(res.type);
+        
+        // Format EV nicely
+        strategyEvEl.textContent = res.maxEV.toFixed(2) + " BB";
+    }
+
+    function getStrategyColor(type) {
+        if(type === 'FOLD') return '#333';
+        if(type === 'CALL - FOLD') return '#FF3030';
+        if(type === 'CALL - CALL') return '#0047BB';
+        return '#AAA';
+    }
+
+    // --- EVENT LISTENERS ---
+
+    function bindInput(id, key, isFloat = false, syncId = null) {
+        const el = document.getElementById(id);
+        el.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            state[key] = val;
+            
+            // Sync paired input if exists
+            if (syncId) {
+                const syncEl = document.getElementById(syncId);
+                if (syncEl.tagName === 'SPAN') {
+                    syncEl.textContent = isFloat ? val.toFixed(2) : val;
+                } else {
+                    syncEl.value = val;
+                }
+            }
+            
+            // If this is the synced input, update the primary
+            if (el.type === 'number' && syncId) {
+                // The syncId passed was likely the range, so update it
+                // Actually, let's just make a specific binder for range/number pairs
+            }
+
+            // Debounce slightly for heavy rendering if needed, 
+            // but for 600x600 direct pixel manipulation is usually fine on modern devices.
+            requestAnimationFrame(drawMap);
+        });
+    }
+
+    // Helper for Range/Number sync
+    function bindRangeNumber(rangeId, numId, key) {
+        const range = document.getElementById(rangeId);
+        const num = document.getElementById(numId);
+
+        range.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            state[key] = val;
+            num.value = val;
+            drawMap();
+        });
+
+        num.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            state[key] = val;
+            range.value = val;
+            drawMap();
+        });
+    }
+
+    // Helper for Range/Span sync
+    function bindRangeSpan(rangeId, spanId, key) {
+        const range = document.getElementById(rangeId);
+        const span = document.getElementById(spanId);
+
+        range.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            state[key] = val;
+            span.textContent = val.toFixed(2);
+            drawMap();
+        });
+    }
+
+    // Initialize Bindings
+    bindRangeNumber('inputS', 'numS', 'S');
+    bindRangeNumber('inputP', 'numP', 'P');
+    bindRangeNumber('inputB', 'numB', 'B');
+    bindRangeSpan('inputN', 'valN', 'N');
+    bindRangeSpan('inputCT', 'valCT', 'cT');
+    bindRangeSpan('inputCR', 'valCR', 'cR');
+
+    // Initial Draw
+    drawMap();
+
+</script>
+
+</body>
+</html>

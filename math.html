@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTO Logic // Anchored Popovers</title>
+    
+    <!-- FONTS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- KATEX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
+
+    <style>
+        :root {
+            --bg-color: #EAEAEA;
+            --ink-color: #111;
+            --accent-color: #FF3B00;
+            --card-width: 300px;
+            --card-height: 420px;
+            --easing: cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--ink-color);
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            position: relative; /* Context for absolute positioning */
+            min-height: 100vh;
+        }
+
+        /* TEXTURE */
+        body::before {
+            content: "";
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+            pointer-events: none; z-index: -1;
+        }
+
+        /* LAYOUT */
+        .grid-wrapper {
+            max-width: 1400px; margin: 0 auto; padding: 80px 40px;
+            display: grid; grid-template-columns: repeat(12, 1fr); gap: 40px;
+        }
+
+        h1 {
+            grid-column: span 12;
+            font-weight: 900; font-size: 4rem; line-height: 0.9;
+            letter-spacing: -0.04em; text-transform: uppercase; margin-bottom: 40px;
+        }
+
+        /* INPUTS */
+        .input-panel {
+            grid-column: span 4; background: #fff; padding: 30px;
+            border: 1px solid #ccc; height: fit-content;
+            position: sticky; top: 40px; z-index: 10;
+        }
+
+        .input-group { margin-bottom: 25px; }
+        label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; color: #666; }
+        input[type="number"] {
+            width: 100%; font-family: 'Inter', sans-serif; font-size: 1.8rem;
+            font-weight: 700; border: none; border-bottom: 2px solid #ddd;
+            padding: 5px 0; background: transparent; transition: 0.3s;
+        }
+        input:focus { outline: none; border-bottom-color: var(--accent-color); }
+
+        /* MODULES */
+        .content-area { grid-column: span 8; display: flex; flex-direction: column; gap: 40px; }
+        
+        .module {
+            background: #fff; padding: 40px; border: 1px solid rgba(0,0,0,0.1);
+            position: relative; transition: border-color 0.3s;
+        }
+        .module:hover { border-color: var(--ink-color); }
+
+        .header-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; border-bottom: 2px solid var(--ink-color);
+            padding-bottom: 15px;
+        }
+
+        h2 { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+
+        /* TRIGGER CHIP */
+        .info-chip {
+            background: var(--ink-color); color: #fff;
+            font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+            padding: 8px 16px; border-radius: 100px; cursor: pointer;
+            text-transform: uppercase; font-weight: 700;
+            display: flex; align-items: center; gap: 8px;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .info-chip:hover { transform: translateY(-2px); background: var(--accent-color); }
+        .info-chip::after { content: '?'; opacity: 0.5; }
+
+        /* MATH DISPLAY */
+        .math-block { background: #F4F4F4; padding: 20px; border-left: 4px solid var(--ink-color); margin: 20px 0; }
+        .big-data { font-size: 3.5rem; font-weight: 900; color: var(--accent-color); margin-top: 10px; line-height: 1; }
+
+        /* --- THE ANCHORED CARD (POPOVER) --- */
+        #popover-anchor {
+            position: absolute; /* Relative to document body */
+            top: 0; left: 0;
+            width: var(--card-width);
+            height: var(--card-height);
+            z-index: 9999;
+            perspective: 1000px;
+            pointer-events: none; /* Ignore clicks when hidden */
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s var(--easing);
+            transform: translateY(10px);
+        }
+
+        #popover-anchor.active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .card-inner {
+            position: relative; width: 100%; height: 100%;
+            text-align: center; transition: transform 0.8s var(--easing);
+            transform-style: preserve-3d;
+            cursor: pointer;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .card-inner.flipped { transform: rotateY(180deg); }
+
+        /* FACES */
+        .card-face {
+            position: absolute; width: 100%; height: 100%;
+            -webkit-backface-visibility: hidden; backface-visibility: hidden;
+            border-radius: 12px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        /* FRONT: RANDOM PLAYING CARD */
+        .front {
+            background: #fff;
+            color: var(--ink-color);
+            padding: 20px;
+        }
+        
+        .card-corner {
+            font-family: 'Inter', sans-serif; font-weight: 900; font-size: 2rem;
+            line-height: 1; display: flex; flex-direction: column; align-items: center;
+        }
+        .card-corner.tl { align-self: flex-start; }
+        .card-corner.br { align-self: flex-end; transform: rotate(180deg); }
+
+        .card-center {
+            font-size: 6rem; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .tap-hint {
+            position: absolute; bottom: 15px; width: 100%; text-align: center; left: 0;
+            font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: #999;
+        }
+
+        /* BACK: INFO DATA */
+        .back {
+            background: var(--ink-color);
+            color: #fff;
+            transform: rotateY(180deg);
+            padding: 30px;
+            text-align: left;
+        }
+
+        .back h3 {
+            font-size: 1rem; color: var(--accent-color); text-transform: uppercase;
+            margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px;
+        }
+
+        .back-content { font-size: 0.9rem; line-height: 1.6; color: #ddd; }
+        .back-content p { margin-bottom: 15px; }
+        .back-content strong { color: #fff; font-weight: 700; }
+        
+        /* Math in Card Override */
+        .back-content .katex { font-size: 0.9em; }
+
+        @media(max-width: 900px) {
+            .grid-wrapper { padding: 40px 20px; }
+            .input-panel, .content-area { grid-column: span 12; }
+            h1 { font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="grid-wrapper">
+        <h1>Equilibrium<br>Construct</h1>
+
+        <!-- INPUTS -->
+        <aside class="input-panel">
+            <div class="header-row"><h2>Variables</h2></div>
+            
+            <div class="input-group">
+                <label>Pot Start (P)</label>
+                <input type="number" id="in-pot" value="5" step="0.5">
+            </div>
+            <div class="input-group">
+                <label>Eff. Stack (S)</label>
+                <input type="number" id="in-stack" value="27.5" step="0.5">
+            </div>
+            <div class="input-group">
+                <label>Value Freq (V)</label>
+                <input type="number" id="in-freq" value="25" step="1">
+            </div>
+        </aside>
+
+        <!-- CONTENT -->
+        <main class="content-area">
+
+            <!-- MODULE 1 -->
+            <section class="module">
+                <div class="header-row">
+                    <h2>01 / Geometric Sizing</h2>
+                    <!-- Pass ID for JS logic -->
+                    <div class="info-chip" data-key="ggop">Explain</div>
+                </div>
+                <div class="math-block">
+                    $$ \text{Growth} = \frac{P + 2S}{P} $$
+                </div>
+                <div class="big-data" id="out-bet">0%</div>
+            </section>
+
+            <!-- MODULE 2 -->
+            <section class="module">
+                <div class="header-row">
+                    <h2>02 / Indifference (α)</h2>
+                    <div class="info-chip" data-key="alpha">Explain</div>
+                </div>
+                <div class="math-block">
+                    $$ \alpha = \frac{\text{Bet}}{\text{Pot} + 2\text{Bet}} $$
+                </div>
+                <div class="big-data" id="out-alpha">0%</div>
+            </section>
+
+            <!-- MODULE 3 -->
+            <section class="module">
+                <div class="header-row">
+                    <h2>03 / Recursive Range</h2>
+                    <div class="info-chip" data-key="recursive">Explain</div>
+                </div>
+                <div class="math-block">
+                    $$ T_{total} = \frac{R_{total}}{1-\alpha} $$
+                </div>
+                <div style="display:flex; gap:30px; flex-wrap:wrap;">
+                    <div>
+                        <span style="font-size:0.7rem; font-weight:700;">RIVER BLUFFS</span>
+                        <div class="big-data" style="font-size:2.5rem" id="out-rbluff">0%</div>
+                    </div>
+                    <div>
+                        <span style="font-size:0.7rem; font-weight:700;">TURN BLUFFS</span>
+                        <div class="big-data" style="font-size:2.5rem; color:#0055ff" id="out-tbluff">0%</div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- THE POPOVER ELEMENT (Moves around the DOM) -->
+    <div id="popover-anchor">
+        <div class="card-inner" id="card-inner">
+            
+            <!-- FRONT: Random Card -->
+            <div class="card-face front">
+                <div class="card-corner tl">
+                    <span class="rank-display">A</span>
+                    <span class="suit-display">♠</span>
+                </div>
+                <div class="card-center suit-display">♠</div>
+                <div class="card-corner br">
+                    <span class="rank-display">A</span>
+                    <span class="suit-display">♠</span>
+                </div>
+                <div class="tap-hint">Tap to Flip</div>
+            </div>
+
+            <!-- BACK: Information -->
+            <div class="card-face back">
+                <h3 id="info-title">Title</h3>
+                <div class="back-content" id="info-body">
+                    <!-- Content injected here -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- 1. CALCULATOR LOGIC ---
+            const ui = {
+                pot: document.getElementById('in-pot'),
+                stack: document.getElementById('in-stack'),
+                freq: document.getElementById('in-freq'),
+                bet: document.getElementById('out-bet'),
+                alpha: document.getElementById('out-alpha'),
+                rBluff: document.getElementById('out-rbluff'),
+                tBluff: document.getElementById('out-tbluff')
+            };
+
+            function calculate() {
+                const P = parseFloat(ui.pot.value) || 0;
+                const S = parseFloat(ui.stack.value) || 0;
+                const V = parseFloat(ui.freq.value) || 0;
+
+                if (P<=0) return;
+
+                // Math
+                const growth = (P + 2*S)/P;
+                const streetRatio = Math.sqrt(growth);
+                const betPct = (streetRatio - 1)/2;
+                
+                const alpha = betPct / (1 + 2*betPct);
+                const vRatio = 1 - alpha;
+                
+                const vDec = V/100;
+                const rTotal = vDec / vRatio;
+                const rBluff = rTotal - vDec;
+                const tTotal = rTotal / vRatio;
+                const tBluff = tTotal - rTotal;
+
+                // Update DOM
+                ui.bet.innerText = (betPct*100).toFixed(1) + "%";
+                ui.alpha.innerText = (alpha*100).toFixed(1) + "%";
+                ui.rBluff.innerText = "+" + (rBluff*100).toFixed(1) + "%";
+                ui.tBluff.innerText = "+" + (tBluff*100).toFixed(1) + "%";
+            }
+
+            // Bind Inputs
+            Object.values(ui).forEach(el => {
+                if(el.tagName === 'INPUT') el.addEventListener('input', calculate);
+            });
+            calculate();
+
+            // --- 2. POPOVER LOGIC ---
+            const popover = document.getElementById('popover-anchor');
+            const cardInner = document.getElementById('card-inner');
+            let activeTrigger = null;
+
+            // Content Data
+            const dataMap = {
+                'ggop': {
+                    title: 'Geometric Growth',
+                    html: `<p>To get all-in smoothly over multiple streets, the pot must grow by a fixed multiplier.</p>
+                           <p>$$ \\text{Growth} = \\frac{P_{start} + 2S_{eff}}{P_{start}} $$</p>
+                           <p>Because there are 2 streets (Turn/River), we take the square root to find the bet size per street.</p>`
+                },
+                'alpha': {
+                    title: 'Indifference (Alpha)',
+                    html: `<p><strong>The Bluff-to-Value Ratio.</strong></p>
+                           <p>Derived from Pot Odds: $$ \\alpha = \\frac{\\text{Risk}}{\\text{Reward} + \\text{Risk}} $$</p>
+                           <p>With a 1.23x overbet, you risk 1.23 to win 1. The odds are bad for the caller, so you can bluff ~35% of the time.</p>`
+                },
+                'recursive': {
+                    title: 'Reverse Engineering',
+                    html: `<p>We build ranges backward from the River.</p>
+                           <p>1. <strong>River:</strong> Add bluffs to your Value hands.</p>
+                           <p>2. <strong>Turn:</strong> The <em>entire</em> River range becomes the Value for the Turn. We add <em>more</em> bluffs on top.</p>`
+                }
+            };
+
+            // Random Card Generators
+            const suits = ['♠', '♥', '♦', '♣'];
+            const ranks = ['A', 'K', 'Q', 'J', '10', '9', '8'];
+            const colors = {'♠':'#111', '♣':'#111', '♥':'#FF3B00', '♦':'#FF3B00'};
+
+            function randomizeCard() {
+                const s = suits[Math.floor(Math.random() * suits.length)];
+                const r = ranks[Math.floor(Math.random() * ranks.length)];
+                const color = colors[s];
+
+                document.querySelectorAll('.suit-display').forEach(el => {
+                    el.innerText = s;
+                    el.style.color = color;
+                });
+                document.querySelectorAll('.rank-display').forEach(el => {
+                    el.innerText = r;
+                    el.style.color = color;
+                });
+            }
+
+            // OPEN Handler
+            document.querySelectorAll('.info-chip').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent document click from closing immediately
+
+                    const key = btn.dataset.key;
+                    if(activeTrigger === btn) {
+                        // Toggle off if clicking same button
+                        closePopover();
+                        return;
+                    }
+                    
+                    activeTrigger = btn;
+                    
+                    // 1. Content
+                    randomizeCard();
+                    document.getElementById('info-title').innerText = dataMap[key].title;
+                    const bodyEl = document.getElementById('info-body');
+                    bodyEl.innerHTML = dataMap[key].html;
+                    
+                    // Re-render math inside the card
+                    renderMathInElement(bodyEl, {
+                        delimiters: [{left: "$$", right: "$$", display: true}]
+                    });
+
+                    // 2. Positioning (ANCHOR LOGIC)
+                    const rect = btn.getBoundingClientRect();
+                    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+                    const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
+
+                    // Position: Top = Element Bottom + ScrollY + Gap
+                    popover.style.top = (rect.bottom + scrollTop + 15) + 'px';
+                    
+                    // Position: Left = Element Left + ScrollX
+                    // Simple edge detection: if too far right, shift left
+                    const cardW = 300; 
+                    let leftPos = rect.left + scrollLeft;
+                    
+                    if (leftPos + cardW > window.innerWidth) {
+                        leftPos = window.innerWidth - cardW - 20;
+                    }
+                    popover.style.left = leftPos + 'px';
+
+                    // 3. Show
+                    popover.classList.add('active');
+                    cardInner.classList.remove('flipped'); // Always start front
+                });
+            });
+
+            // FLIP Handler
+            cardInner.addEventListener('click', (e) => {
+                e.stopPropagation();
+                cardInner.classList.toggle('flipped');
+            });
+
+            // CLOSE Handler (Click Outside)
+            document.addEventListener('click', (e) => {
+                if(popover.classList.contains('active')) {
+                    // If click is NOT inside the popover
+                    if (!popover.contains(e.target)) {
+                        closePopover();
+                    }
+                }
+            });
+
+            function closePopover() {
+                popover.classList.remove('active');
+                activeTrigger = null;
+            }
+
+        });
+    </script>
+</body>
+</html>
