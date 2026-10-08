@@ -17,11 +17,13 @@ Consolidate all six standalone ChoppedPoker HTML tools (`index.html`, `CHECK_BET
 - [Ticket 004: Mathematical Models, Baseline Values, and Precision Calibration](file:///Users/diesel/Desktop/ChoppedPoker/.sandcastle/worktrees/agent-plan-20261008T232953-546-t6ji/wayfinder/20261008T232953-546-t6ji/tickets/ticket-004.md) — Exact mathematical execution across all six sections, calibration of updated default baseline parameters, zero-combo edge case handling in range composition, and pure white coloring in strategy map impossible region ($c_T < N$).
 - [Ticket 005: Interactive Modals, Canvas High-DPI Scaling, and Boundary Collision Safeguards](file:///Users/diesel/Desktop/ChoppedPoker/.sandcastle/worktrees/agent-plan-20261008T232953-546-t6ji/wayfinder/20261008T232953-546-t6ji/tickets/ticket-005.md) — Anchored 3D flip card popovers with viewport collision detection, internal card math re-rendering, card tilt effects, and Retina HiDPI canvas backing store scaling.
 - [Ticket 006: Error Governance, CDN Resilience, and Acceptance Criteria Verification Framework](file:///Users/diesel/Desktop/ChoppedPoker/.sandcastle/worktrees/agent-plan-20261008T232953-546-t6ji/wayfinder/20261008T232953-546-t6ji/tickets/ticket-006.md) — Pinned CDN resource loading (KaTeX 0.16.9 and Google Fonts), fail-fast DOM element verification, zero console exception enforcement, and objective verification checklist for AC-01 through AC-10.
+- [Ticket 007: Integration Test Decision Mapping, Payload Admissibility Governance, and Verification Planning](file:///Users/diesel/Desktop/ChoppedPoker/.sandcastle/worktrees/agent-plan-20261008T232953-546-t6ji/wayfinder/20261008T232953-546-t6ji/tickets/ticket-007.md) — Authoritative integration test architecture, codebase schema mappings, payload admissibility register with zero synthetic mocks (`INV-PAYLOAD-01`), specification oracles (`INV-ASSERTION-01`), failure taxonomies, and test matrix covering AC-01 through AC-10.
 
 ## Not yet specified
-- None. All architectural facets, component schemas, data contracts, and integration requirements are fully deconstructed and resolved.
+- None. All integration test decisions, codebase schemas, payload admissibility rules, and verification matrices are fully resolved and locked. Frontier is empty.
 
 ## Out of scope
 - Server-side rendering, Node.js backend dependencies, or npm build pipelines (the application must remain a pure, standalone static HTML/CSS/JS file).
 - Modifying underlying poker game theory models or replacing KaTeX with rasterized formula images.
 - Unmanaged directory scanning or editing other run directory artifacts.
+- Writing executable test code, fixtures, or mocks prior to explicit operator authorization (`INV-BOUNDARY-01`).

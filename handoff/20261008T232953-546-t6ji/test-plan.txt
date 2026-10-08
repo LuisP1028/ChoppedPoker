@@ -1,0 +1,3 @@
+wayfinder/20261008T232953-546-t6ji/tickets/ticket-007.md
+wayfinder/20261008T232953-546-t6ji/test_matrix.md
+wayfinder/20261008T232953-546-t6ji/map.md
