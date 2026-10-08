@@ -2236,7 +2236,7 @@
                 const COL_IMP = [255, 255, 255];     // #FFFFFF
 
                 function calculateEVs(S, P, B, N, cT, cR) {
-                    if (cT < N) {
+                    if (cT <= 0 || cT < N) {
                         return { type: 'IMPOSSIBLE', maxEV: 0, fold: 0, cf: 0, cc: 0 };
                     }
 
@@ -2273,7 +2273,7 @@
                             const pixelCT = x / width;
                             const index = (y * width + x) * 4;
 
-                            if (pixelCT < state.N) {
+                            if (pixelCT <= 0 || pixelCT < state.N) {
                                 data[index] = COL_IMP[0];
                                 data[index + 1] = COL_IMP[1];
                                 data[index + 2] = COL_IMP[2];
